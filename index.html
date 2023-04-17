@@ -1,0 +1,177 @@
+<html lang="en">
+
+<head>
+	<title>three-cs</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="./player/css/player.css">
+	<link type="text/css" rel="stylesheet" href="./player/css/panel.css">
+</head>
+
+<body>
+	<canvas id="phoneKeySet" ></canvas>
+	<div id="init-layer">
+		<div class="game-star mousePoint" id="play">
+			PLAY
+		</div>
+		<div id="select-layer">
+			<div class="item-layer mousePoint" id="single">
+				单人
+				<span>single</span>
+			</div>
+			<div class="item-layer mousePoint" id="multiple">
+				匹配
+				<span>multiple</span>
+			</div>
+		</div>
+	</div>
+	<div id="over-layer">
+		<div class="game-over">
+			<h1 id='win'>Game Over</h1>
+			<p>kill:<span id="kill">0</span> | <span id="restart" class="mousePoint">重新开始</span> </p>
+		</div>
+	</div>
+	<div class="accessbar">
+		<div id="progress">
+			<div id="heart">100%</div>
+		</div>
+	</div>
+	<div id="container"></div>
+	<div id="point"></div>
+	<canvas width="250" height="250" id="navigation"></canvas>
+	<div id="chat">
+		<div id="chatList">
+		</div>
+	</div>
+	<script type="importmap">
+		{
+			"imports": {
+				"three": "./player/three/three.module.js"
+			}
+		}
+	</script>
+	<script src="./player/tool/es-module-shims.js"></script>
+	<script src="./player/tool/jsencrypt.js"></script>
+	<script src="./player/tool/socket.io.js"></script>
+	<script type="module">
+		import * as THREE from 'three';
+		import { GLTFLoader } from './player/three/loaders/GLTFLoader.js';
+		import { DRACOLoader } from './player/three/loaders/DRACOLoader.js';
+		import Stats from './player/three/libs/stats.module.js';
+		import { initpanel } from './player/panel.js';
+
+		let container;
+		let camera, scene, renderer;
+		let light;
+		const clock = new THREE.Clock();
+		let stats;
+		let panel;
+		let cameraTim=0
+		init();
+
+		function init() {
+			container = document.getElementById('container');
+			camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+			scene = new THREE.Scene();
+			camera.rotation.order = 'YXZ';
+			renderer = new THREE.WebGLRenderer({
+				antialias: true
+			});
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.outputEncoding = THREE.sRGBEncoding;
+			container.appendChild(renderer.domElement);
+
+			const ambientLight = new THREE.AmbientLight('#707070');
+			scene.add(ambientLight);
+ 
+			light = new THREE.DirectionalLight('#ffffff', 1);
+			light.position.set(- 10, 18, 5);
+			scene.add(light);
+			
+			stats = new Stats();
+			stats.domElement.style.position = 'absolute';
+			stats.domElement.style.top = '20px';
+			stats.domElement.style.left = 'auto';
+			stats.domElement.style.right = '10px';
+			container.appendChild(stats.domElement);
+
+
+			createObj();
+			window.addEventListener('resize', onWindowResize);
+		}
+
+		async function createObj() {
+			//TextureLoader
+			const textureLoader = new THREE.TextureLoader();
+			const bloodMap = textureLoader.load('player/img/blood.png')
+			
+			//AudioLoader
+			const audioLoader = new THREE.AudioLoader();
+			const listener = new THREE.AudioListener();
+			camera.add( listener );
+			const audioList=[]
+			const gunBuffer = await gftload(audioLoader,'player/sounds/gun.mp3')
+			const runBuffer = await gftload(audioLoader,'player/sounds/run.mp3')
+			gunBuffer.name='gun'
+			runBuffer.name='run'
+			audioList.push(gunBuffer,runBuffer)
+			
+			//GLTFLoader
+			const gloader = new GLTFLoader();
+			const dracoLoader = new DRACOLoader();
+			dracoLoader.setDecoderPath('player/three/gltf/');
+			dracoLoader.preload();
+			gloader.setDRACOLoader(dracoLoader);
+			const gun = await gftload(gloader,'player/gltf/gun.glb')
+			const foot = await gftload(gloader,'player/gltf/foot.glb')
+			const gltf = await gftload(gloader,'player/gltf/bullte.glb')
+			const personGroup = new THREE.Group();
+			const bulletGroup = new THREE.Group();
+			personGroup.add(foot.scene);
+			scene.add(personGroup, bulletGroup);
+			gltf.scene.traverse(child => {
+				if (child.isMesh) {
+					child.frustumCulled = false;
+				}
+			});
+			camera.position.set(-350,35,280)
+			panel = initpanel(gltf,gun,personGroup,bulletGroup,camera,audioList,listener,bloodMap)
+			animate();
+		}
+
+		function gftload(loader,path){
+			return new Promise((resolve,reject)=>{
+				loader.load(path, (obj)=> { resolve(obj) },'',(error)=> { reject(error) })
+			})
+		}
+
+
+		function onWindowResize() {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			renderer.setPixelRatio(window.devicePixelRatio);
+		}
+
+		function animate() {
+			
+			requestAnimationFrame(animate);
+			const mixerUpdateDelta = clock.getDelta();
+			panel.navs.draw(panel.personList)
+			panel.personList.forEach((item)=>{
+				item.update( mixerUpdateDelta )
+			})
+			renderer.render(scene,camera)
+			stats.update();
+			if( panel.personList.length==0 ){
+				camera.position.z = 100*Math.sin(cameraTim) + 150;
+				cameraTim +=0.001
+			}
+		}
+
+	</script>
+
+</body>
+
+</html>

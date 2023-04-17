@@ -1,0 +1,66 @@
+#point {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    background-color: #fff;
+    border-radius: 5px;
+    left:calc(50vw - 2.5px);
+    top:calc(50vh - 2.5px);
+}
+
+#imgpos{
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    left:calc(50vw - 25px);
+    top:calc(50vh - 25px);
+    opacity:0;
+    transition : all 0.1s ease-out;
+}
+
+#imgpos.hide{
+    opacity:1;
+    width: 60px;
+    height: 60px;
+    left:calc(50vw - 30px);
+    top:calc(50vh - 30px);
+}
+
+.accessbar {
+    width: 200px;
+    height:15px;
+    background-color: rgba(221, 221, 221, 0.251);
+    border-radius: 10px;
+    position:absolute ;
+    bottom: 30px;
+    left: 10px;
+}
+#progress {
+    width:100%;
+    height: 100%;
+    background-image: linear-gradient(to right, rgba(81, 0, 0, 0.254) , rgb(214, 77, 77));
+    border-radius: 10px;
+}
+
+.mousePoint{
+    cursor: pointer;
+}
+
+#heart {
+    position: absolute;
+    top: 50%;
+    left:100%;
+    transform: translate(10%, -50%);
+    font-size: 18px;
+    color: #555;
+}
+
+#phoneKeySet {
+	position: absolute;
+	width: 100%;
+	height: 100vh;
+	top:0;
+	left: 0;
+	display: none;
+	z-index: 998;
+}

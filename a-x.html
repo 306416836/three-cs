@@ -1,0 +1,306 @@
+<html lang="en">
+
+	<head>
+		<title>three-cs</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				color: #333;
+				background-size: cover;
+				background-repeat: no-repeat;
+				padding: 0;
+				overflow: hidden;
+				margin: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="container"></div>
+		<script type="importmap">
+		{
+			"imports": {
+				"three": "./player/three/three.module.js"
+			}
+		}
+	</script>
+		<script src="./player/tool/es-module-shims.js"></script>
+		<script type="module">
+			import * as THREE from 'three';
+			let container;
+			let camera, scene, renderer;
+			let light;
+			let raycaster = new THREE.Raycaster();
+			let chooseList = []
+			let chooseMaterial = new THREE.MeshLambertMaterial({
+				color: '#00bbff'
+			})
+			let vsMaterial = new THREE.MeshLambertMaterial({
+				color: '#00212d'
+			})
+			let defMaterial = new THREE.MeshLambertMaterial({
+				color: '#001219'
+			})
+			let grid = []
+			let oldMesh
+			class GridNode {
+				constructor(i, j, x, y, weight, mesh) {
+					this.x = i;
+					this.y = j;
+					this.weight = weight;
+					this.f = 0;
+					this.g = 0;
+					this.h = 0;
+					this.visited = false;
+					this.closed = false;
+					this.parent = null;
+					this.pos = {
+						x: x,
+						y: y
+					}
+					this.mesh = mesh
+					/*
+					weight：节点的权重。如果权重为0，则表示该节点是墙壁，不能通过。
+					f：节点的f值，表示从起点到终点经过该节点的预估总代价。f值等于g值加上h值。
+					g：节点的g值，表示从起点到该节点的实际代价。
+					h：节点的h值，表示从该节点到终点的预估代价。h值通常使用启发式函数计算。
+					*/
+				}
+
+				isWall() {
+					return this.weight === 0;
+				}
+			}
+
+			container = document.getElementById('container');
+			camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+			scene = new THREE.Scene();
+			camera.rotation.order = 'YXZ';
+			renderer = new THREE.WebGLRenderer({
+				antialias: true
+			});
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.outputEncoding = THREE.sRGBEncoding;
+			container.appendChild(renderer.domElement);
+
+			camera.position.set(50, -100, 50)
+			camera.lookAt(50, 0, 50)
+			const ambientLight = new THREE.AmbientLight('#707070', 1);
+			scene.add(ambientLight);
+
+			light = new THREE.DirectionalLight('#ffffff', 1);
+			light.position.set(-10, 18, 5);
+			scene.add(light);
+
+			creatMap()
+
+			document.addEventListener('mousemove', (event) => {
+				const array = getIntersects(event.clientX, event.clientY);
+				if (oldMesh) {
+					oldMesh.visible = true
+					oldMesh = ''
+				}
+				if (array.length) {
+					oldMesh = array[0].object
+					oldMesh.visible = false
+				}
+			})
+
+			document.addEventListener('mousedown', (event) => {
+				console.log(camera)
+				const array = getIntersects(event.clientX, event.clientY);
+				if (array.length) {
+					chooseList.push(new GridNode(array[0].object.address.i, array[0].object.address.j, array[0].object
+						.position.x, array[0].object.position.z, 1))
+					array[0].object.material = chooseMaterial
+				}
+				if (chooseList.length >= 2) {
+					let arr = aStarSearch(grid, chooseList.shift(), chooseList.shift())
+					if (arr.length > 0) {
+						arr.forEach((item) => {
+							item.weight = 0;
+							item.mesh.material = chooseMaterial
+						})
+					}
+				} else {
+					cleargrid()
+				}
+			});		
+			animate()
+
+			function cleargrid() {
+				chooseMaterial.color.set('#003648')
+				chooseMaterial = new THREE.MeshLambertMaterial({
+					color: '#00bfff'
+				})
+				for (let i = 0; i < 100; i++) {
+					for (let j = 0; j < 100; j++) {
+						var c = grid[i][j]
+						c.f = 0;
+						c.g = 0;
+						c.h = 0;
+						c.visited = false;
+						c.closed = false;
+						c.parent = null;
+					}
+				}
+			}
+
+			function getIntersects(pointX, pointY) {
+				raycaster.setFromCamera(new THREE.Vector2((pointX / window.innerWidth) * 2 - 1, -(pointY / window.innerHeight) *
+					2 + 1), camera);
+				return raycaster.intersectObjects(scene.children);
+			}
+
+			function creatMap() {
+				for (let i = 0; i < 100; i++) {
+					grid.push([])
+					for (let j = 0; j < 100; j++) {
+						const sheenMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), defMaterial)
+						sheenMesh.rotation.x = Math.PI / 2
+						sheenMesh.position.set(i, 0, j)
+						sheenMesh.address = {
+							i: i,
+							j: j
+						}
+						var wall = i == 0 || j == 0 ? 0 : 1;
+						grid[i].push(new GridNode(i, j, i, j, wall, sheenMesh))
+						scene.add(sheenMesh);
+					}
+				}
+			}
+			function aStarSearch(grid, startNode, endNode) {
+				// 创建一个openList数组，用于存储待处理的节点
+				const openList = [];
+				let num = 0
+				// 将起始节点添加到openList中
+				openList.push(startNode);
+				// 当openList不为空时，继续循环
+				while (openList.length > 0) {
+					// 找到openList中f值最小的节点
+					let lowInd = 0;
+					for (let i = 0; i < openList.length; i++) {
+						if (openList[i].f < openList[lowInd].f) {
+							lowInd = i;
+							num++
+						}
+					}
+					let currentNode = openList[lowInd];
+					// 如果当前节点是终点，返回路径
+					if (currentNode.x === endNode.x && currentNode.y === endNode.y) {
+						let curr = currentNode;
+						let ret = [];
+						while (curr.parent) {
+							ret.push(curr);
+							curr = curr.parent;
+							num++
+						}
+						return ret.reverse();
+					}
+					// 将当前节点从openList中移除，并将其标记为已关闭
+					openList.splice(lowInd, 1);
+					currentNode.closed = true;
+					// 获取当前节点的邻居节点
+					let neighbors = getNeighbors(grid, currentNode);
+					// 遍历邻居节点
+					for (let i = 0; i < neighbors.length; i++) {
+						num++
+						let neighbor = neighbors[i];
+						// 如果邻居节点已关闭或者是墙壁，则跳过
+						if (neighbor.closed || neighbor.isWall()) {
+							continue;
+						}
+						// 计算从起点到邻居节点的g值
+						let gScore = currentNode.g + 1;
+						let gScoreIsBest = false;
+						// 如果邻居节点未被访问过，则将其标记为已访问，并计算其h值和f值
+						if (!neighbor.visited) {
+							gScoreIsBest = true;
+							neighbor.h = heuristic(neighbor, endNode);
+							neighbor.visited = true;
+							neighbor.mesh.material = vsMaterial
+							openList.push(neighbor);
+						} else if (gScore < neighbor.g) {
+							// 如果新计算的g值小于原来的g值，则更新g值和f值
+							gScoreIsBest = true;
+						}
+						if (gScoreIsBest) {
+							// 更新邻居节点的父节点、g值和f值
+							neighbor.parent = currentNode;
+							neighbor.g = gScore;
+							neighbor.f = neighbor.g + neighbor.h;
+						}
+					}
+				}
+				// 如果没有找到路径，返回空数组
+				return [];
+			}
+
+
+			function getNeighbors(grid, node) {
+				const ret = [];
+				const x = Number(node.x);
+				const y = Number(node.y);
+				if (grid[x - 1]) {
+					if (grid[x - 1][y]) {
+						ret.push(grid[x - 1][y]);
+					}
+					if (grid[x - 1][y - 1] && !grid[x - 1][y].isWall()) {
+						ret.push(grid[x - 1][y - 1]);
+					}
+					if (grid[x - 1][y + 1] && !grid[x - 1][y].isWall()) {
+						ret.push(grid[x - 1][y + 1]);
+					}
+				}
+				if (grid[x + 1]) {
+					if (grid[x + 1][y]) {
+						ret.push(grid[x + 1][y]);
+					}
+					if (grid[x + 1][y + 1] && !grid[x + 1][y].isWall()) {
+						ret.push(grid[x + 1][y + 1]);
+					}
+					if (grid[x + 1][y - 1] && !grid[x + 1][y].isWall()) {
+						ret.push(grid[x + 1][y - 1]);
+					}
+				}
+				if (grid[x][y - 1]) {
+					ret.push(grid[x][y - 1]);
+				}
+				if (grid[x][y + 1]) {
+					ret.push(grid[x][y + 1]);
+				}
+
+				return ret;
+			}
+
+
+			function heuristic(pos0, pos1) {
+				const d1 = Math.abs(pos1.x - pos0.x);
+				const d2 = Math.abs(pos1.y - pos0.y);
+				return d1 + d2;
+			}
+
+			function distanceSquared(a, b) {
+				const dx = a.x - b.x;
+				const dy = a.y - b.y;
+				return dx * dx + dy * dy;
+			}
+
+			function distance(a, b) {
+				return Math.sqrt(distanceSquared(a, b));
+			}
+
+
+			function animate() {
+
+				requestAnimationFrame(animate);
+				renderer.render(scene, camera)
+				stats.update();
+
+			}
+		</script>
+
+	</body>
+
+</html>
