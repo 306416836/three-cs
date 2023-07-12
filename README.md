@@ -3,7 +3,7 @@
 [体验网址](http://toupp.vip/example/cs) http://toupp.vip/example/cs
 
 
-![游戏动画.gif](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/22b3f0c4e7074d259479974a0e123a6a~tplv-k3u1fbpfcp-watermark.image?)
+![游戏动画.gif](http://toupp.vip:7001/file/find?id=4087A2EBFC)
 
 > 当AI席卷全球的时候，我就在思考未来的方向~
 > 产能过剩必将淘汰很多职业与个人，同时这将也是转机的开始······
